@@ -20,6 +20,8 @@ import { PluginManager } from 'sn-plugin-lib';
  * Displays Hello World text in the center of the screen
  */
 function App(): React.JSX.Element {
+  console.log("UNDO/APP started ");
+
   const isDarkMode = useColorScheme() === 'dark';
 
   const handleClose = () => {
@@ -29,13 +31,13 @@ function App(): React.JSX.Element {
   return (
     <View style={styles.container}>
       <Pressable style={styles.closeButton} onPress={handleClose}>
-        <Text style={[styles.closeText, {color: isDarkMode ? '#ffffff' : '#000000'}]}>✕</Text>
+        <Text style={[styles.closeText, { color: isDarkMode ? '#ffffff' : '#000000' }]}>✕</Text>
       </Pressable>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#000000' : '#ffffff'}
       />
-      <Text style={[styles.helloText, {color: isDarkMode ? '#ffffff' : '#000000'}]}>
+      <Text style={[styles.helloText, { color: isDarkMode ? '#ffffff' : '#000000' }]}>
         Hello World
       </Text>
     </View>

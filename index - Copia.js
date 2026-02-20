@@ -8,7 +8,6 @@ AppRegistry.registerComponent(appName, () => App);
 PluginManager.init();
 
 const PADDING = 15;
-const MARGIN = 100;
 
 let lastProcessedUuid = null;
 
@@ -47,42 +46,33 @@ PluginManager.registerEventListener('event_pen_up', 1, {
           saveStringTo(JSON.stringify(pageRes), '/sdcard/pageRes.json');
           console.log(`[UNDO-LOG/4] element on page readed`);
 
-          if (!pageRes.success) {
-            console.log('[UNDO-LOG/6a] pageRes result emptyu');
-          } else {
-            const scribbleArea = await getElementBounds(el);
-            // saveStringTo(JSON.stringify(scribbleArea), '/sdcard/scribbleArea.json');
-            console.log(`[UNDO-LOG/5] scribbleArea ${JSON.stringify(scribbleArea)}`);
+          const scribbleArea = await getElementBounds(el);
+          saveStringTo(JSON.stringify(scribbleArea), '/sdcard/scribbleArea.json');
+          console.log(`[UNDO-LOG/5] scribbleArea saved`);
 
+          if (!pageRes.success) {
+            console.log('[UNDO-LOG/6a] nothing to delete.');
+          } else {
             let removedCount = 0;
-            console.log(`[UNDO-LOG/6b] element on page ${pageRes.result.length}`);
+            console.log(`[UNDO-LOG/6b] element behind scrible ${JSON.stringify(pageRes.result.length)}`);
             for (const target of pageRes.result) {
               console.log('[UNDO-LOG/7] Element', target.uuid, 'found');
               if (target.uuid === el.uuid) {
                 console.log('[UNDO-LOG/8] Element', target.uuid, 'is scrible');
                 continue;
               }
-              // dobbiamo verificare i contorni. 
-              // target ha i suoi contorni contoursSrc che sono array di array di punti
-              // da cui derivare il bounding box
-              const targetArea = await getElementBounds(target);
-
               // Controllo collisione Bounding Box [cite: 5]
-              if (checkOverlap(scribbleArea, targetArea)) {
+              if (checkOverlap(scribbleArea, target)) {
                 console.log('[UNDO-LOG/9] Element', target.uuid, 'will be removed');
 
                 // Rilascia la cache nativa e rimuove l'elemento 
-                delete_element(target.uuid); // 
+                // PluginCommAPI.recycleElement(target.uuid); // 
                 removedCount++;
               }
             }
 
             // Rimuoviamo lo scarabocchio stesso per non lasciare tracce 
-            delete_element(el.uuid);
-
-            // add new element 
-            insertGeometryFromArea(scribbleArea);
-
+            // PluginCommAPI.recycleElement(el.uuid); // 
             console.log(`[UNDO-LOG/A] Successo: Rimossi ${removedCount} elementi e pulito lo scarabocchio.`);
           }
         }
@@ -92,14 +82,6 @@ PluginManager.registerEventListener('event_pen_up', 1, {
   },
 });
 
-async function delete_element(uuid) {
-  const res = await PluginCommAPI.recycleElement(uuid);
-  if (!res.success) {
-    throw new Error(res.error?.message ?? 'delete_element call failed');
-  }
-  console.log(`[UNDO-LOG/delete_element] Element ${uuid} deleted`);
-  return res.result;
-}
 
 async function analyzeScribble(stroke) {
   const pointsAccessor = stroke.points;
@@ -107,13 +89,14 @@ async function analyzeScribble(stroke) {
 
   console.log(`[UNDO-LOG/analyzeScribble] Analisi di ${size} pointsAccessor`);
 
+
   // Uno scarabocchio significativo ha molti punti
   if (size < 30) return false;
 
   const points = await pointsAccessor.getRange(0, size);
 
   console.log(`[UNDO-LOG/analyzeScribble] Analisi di ${points.length} punti`);
-  // saveStringTo(JSON.stringify(points), '/sdcard/points1.json');
+  saveStringTo(JSON.stringify(points), '/sdcard/points1.json');
 
   let xInversions = 0;
   let yInversions = 0;
@@ -156,59 +139,30 @@ async function analyzeScribble(stroke) {
 async function getElementBounds(el) {
   const size = await el.stroke.points.size(); // [cite: 3, 4]
   const points = await el.stroke.points.getRange(0, size); // [cite: 3, 4]
-  //  saveStringTo(JSON.stringify(points), '/sdcard/points2.json');
+  saveStringTo(JSON.stringify(points), '/sdcard/points2.json');
 
   let minX = points[0].x, minY = points[0].y;
-  let maxX = points[0].x, maxY = points[0].y;
   points.forEach(p => {
     if (p.x < minX) minX = p.x;
     if (p.y < minY) minY = p.y;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y > maxY) maxY = p.y;
   });
 
   return {
-    minX: minX,
-    minY: minY,
-    maxX: maxX,
-    maxY: maxY
+    minX: minX - PADDING,
+    minY: minY - PADDING,
+    maxX: el.maxX + PADDING, // [cite: 5]
+    maxY: el.maxY + PADDING  // [cite: 5]
   };
 }
 
 function checkOverlap(scribble, target) {
   // Confronto rapido tra i rettangoli di ingombro (Bounding Box) [cite: 5]
-  //  console.log(`[UNDO-LOG/checkOverlap] scribble ${JSON.stringify(scribble)}`);
-  //  console.log(`[UNDO-LOG/checkOverlap] target ${JSON.stringify(target)}`);
+  console.log(`[UNDO-LOG/checkOverlap] scribble \n${JSON.stringify(scribble)}`);
+  console.log(`[UNDO-LOG/checkOverlap] target \n${JSON.stringify(target)}`);
   return (
-    target.minX >= (scribble.minX - MARGIN) &&
-    target.maxX <= (scribble.maxX + MARGIN) &&
-    target.minY >= (scribble.minY - MARGIN) &&
-    target.maxY <= (scribble.maxY + MARGIN)
+    target.maxX >= scribble.minX &&
+    (target.maxX - 100) <= scribble.maxX &&
+    target.maxY >= scribble.minY &&
+    (target.maxY - 100) <= scribble.maxY
   );
-}
-
-async function insertGeometryFromArea(area) {
-  const geometry = {
-    penColor: 0x9D,
-    penType: 10,
-    penWidth: 2,
-    type: 'GEO_polygon',
-    points: [
-      { x: area.minX, y: area.minY }, // In alto a sinistra
-      { x: area.maxX, y: area.minY }, // In alto a destra
-      { x: area.maxX, y: area.maxY }, // In basso a destra
-      { x: area.minX, y: area.maxY }, // In basso a sinistra
-      { x: area.minX, y: area.minY }  // Torna all'inizio per chiudere 
-    ],
-    ellipseCenterPoint: null,
-    ellipseMajorAxisRadius: 0,
-    ellipseMinorAxisRadius: 0,
-    ellipseAngle: 0,
-  };
-
-  const res = await PluginCommAPI.insertGeometry(geometry);
-  if (!res.success) {
-    throw new Error(res.error?.message ?? 'insertGeometry call failed');
-  }
-  return res.result;
 }

@@ -1,0 +1,106 @@
+[
+    {
+        "stroke": {
+            "recognPoints": {
+                "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+                "type": 7,
+                "_size": -1,
+                "cache": {
+                },
+                "cacheRanges": [
+                ],
+                "dataType": "recognData"
+            },
+            "markPenDirection": {
+                "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+                "type": 6,
+                "_size": -1,
+                "cache": {
+                },
+                "cacheRanges": [
+                ],
+                "dataType": "point"
+            },
+            "penColor": 0,
+            "eraseLineTrailNums": {
+                "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+                "type": 4,
+                "_size": -1,
+                "cache": {
+                },
+                "cacheRanges": [
+                ],
+                "dataType": "number"
+            },
+            "pressures": {
+                "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+                "type": 3,
+                "_size": -1,
+                "cache": {
+                },
+                "cacheRanges": [
+                ],
+                "dataType": "number"
+            },
+            "penType": 10,
+            "flagDraw": {
+                "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+                "type": 5,
+                "_size": -1,
+                "cache": {
+                },
+                "cacheRanges": [
+                ],
+                "dataType": "boolean"
+            },
+            "points": {
+                "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+                "type": 2,
+                "_size": -1,
+                "cache": {
+                },
+                "cacheRanges": [
+                ],
+                "dataType": "point"
+            }
+        },
+        "angles": {
+            "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+            "type": 0,
+            "_size": -1,
+            "cache": {
+            },
+            "cacheRanges": [
+            ],
+            "dataType": "point"
+        },
+        "contoursSrc": {
+            "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125",
+            "type": 1,
+            "_size": -1,
+            "cache": {
+            },
+            "cacheRanges": [
+            ],
+            "dataType": "pointArray"
+        },
+        "status": 0,
+        "numInPage": 87,
+        "recognizeResult": {
+            "down_right_point_y": 466,
+            "down_right_point_x": 778,
+            "up_left_point_x": 650,
+            "predict_name": "others",
+            "key_point_y": 426,
+            "key_point_x": 713,
+            "up_left_point_y": 387
+        },
+        "maxY": 15725,
+        "thickness": 400,
+        "pageNum": 19,
+        "maxX": 20967,
+        "layerNum": 0,
+        "type": 0,
+        "uuid": "8f7e1680-9fe9-4c13-8eb4-6ac145a44125"
+    }
+]

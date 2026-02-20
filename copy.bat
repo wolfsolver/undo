@@ -1,0 +1,1 @@
+adb push .\build\outputs\undo.snplg /storage/self/primary/Mystyle/Plugin/

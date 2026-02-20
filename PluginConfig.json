@@ -1,0 +1,10 @@
+﻿{
+    "pluginID":  "369ydgivkbcl3cu4",
+    "pluginKey":  "undo",
+    "iconPath":  "",
+    "desc":  "",
+    "name":  "undo",
+    "versionCode":  "1",
+    "versionName":  "0.0.1",
+    "jsMainPath":  "index"
+}
