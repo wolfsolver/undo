@@ -23,29 +23,29 @@ PluginManager.registerEventListener('event_pen_up', 1, {
     }
     lastProcessedUuid = new_uuid;
 
-    console.log(`[UNDO-LOG/1] Penna alzata. Analisi di ${elements.length} nuovi elementi...`);
+    console.log(`[UNDO-LOG/1] Pen up. Analyzing ${elements.length} new elements...`);
     //    console.log(`[UNDO-LOG] elements = ${JSON.stringify(elements)}`);
 
     saveStringTo(JSON.stringify(elements), '/sdcard/elements.json');
 
     for (const el of elements) {
-      console.log(`[UNDO-LOG/2] ${el.uuid} di tipo ${el.type}`);
-      // Verifichiamo se è uno stroke (TYPE_STROKE = 0) [cite: 5]
+      console.log(`[UNDO-LOG/2] ${el.uuid} of type ${el.type}`);
+      // Check if it's a stroke (TYPE_STROKE = 0) [cite: 5]
       if (el.type === 0 && el.stroke) {
 
         const isScribble = await analyzeScribble(el.stroke);
 
         if (!isScribble) {
-          console.log(`[UNDO-LOG/3a] (UUID: ${el.uuid}) non e' uno Scarabocchio`);
+          console.log(`[UNDO-LOG/3a] (UUID: ${el.uuid}) is not a Scribble`);
         } else {
-          console.log(`[UNDO-LOG/3b] Scarabocchio confermato (UUID: ${el.uuid}). Ricerca elementi da cancellare...`);
+          console.log(`[UNDO-LOG/3b] Scribble confirmed (UUID: ${el.uuid}). Searching for elements to delete...`);
           console.log(`[UNDO-LOG/3c] Getting path`);
           const pathRes = await PluginCommAPI.getCurrentFilePath();
           console.log(`[UNDO-LOG/3d] pathRes ${pathRes.result}. Getting elements`);
           const pageRes = await PluginFileAPI.getElements(el.pageNum, pathRes.result);
           // console.log(`[UNDO-LOG/4] element on page ${JSON.stringify(pageRes)}`);
           saveStringTo(JSON.stringify(pageRes), '/sdcard/pageRes.json');
-          console.log(`[UNDO-LOG/4] element on page readed`);
+          console.log(`[UNDO-LOG/4] element on page read`);
 
           if (!pageRes.success) {
             console.log('[UNDO-LOG/6a] pageRes result emptyu');
@@ -62,33 +62,34 @@ PluginManager.registerEventListener('event_pen_up', 1, {
                 console.log('[UNDO-LOG/8] Element', target.uuid, 'is scrible');
                 continue;
               }
-              // dobbiamo verificare i contorni. 
-              // target ha i suoi contorni contoursSrc che sono array di array di punti
-              // da cui derivare il bounding box
+              // We need to verify the bounds.
+              // target has its own contours (contoursSrc) which are arrays of arrays of points
+              // from which we derive the bounding box.
               const targetArea = await getElementBounds(target);
 
-              // Controllo collisione Bounding Box [cite: 5]
+              // Bounding Box collision check [cite: 5]
               if (checkOverlap(scribbleArea, targetArea)) {
                 console.log('[UNDO-LOG/9] Element', target.uuid, 'will be removed');
 
-                // Rilascia la cache nativa e rimuove l'elemento 
+                // Release native cache and remove the element 
                 delete_element(target.uuid); // 
                 removedCount++;
               }
             }
 
-            // Rimuoviamo lo scarabocchio stesso per non lasciare tracce 
+            // Remove the scribble itself to leave no trace 
             delete_element(el.uuid);
 
-            // add new element 
+            // add new element just for testing. 
             insertGeometryFromArea(scribbleArea);
+            insertLineFromArea(scribbleArea);
 
-            console.log(`[UNDO-LOG/A] Successo: Rimossi ${removedCount} elementi e pulito lo scarabocchio.`);
+            console.log(`[UNDO-LOG/A] Success: Removed ${removedCount} elements and cleaned up the scribble.`);
           }
         }
       }
     }
-    console.log(`[UNDO-LOG/Z] Penna alzata. Fine analisi ${new_uuid}`);
+    console.log(`[UNDO-LOG/Z] Pen up. End of analysis ${new_uuid}`);
   },
 });
 
@@ -105,50 +106,64 @@ async function analyzeScribble(stroke) {
   const pointsAccessor = stroke.points;
   const size = await pointsAccessor.size();
 
-  console.log(`[UNDO-LOG/analyzeScribble] Analisi di ${size} pointsAccessor`);
+  console.log(`[UNDO-LOG/analyzeScribble] Analyzing ${size} pointsAccessor`);
 
-  // Uno scarabocchio significativo ha molti punti
+  // A significant scribble has many points
   if (size < 30) return false;
 
   const points = await pointsAccessor.getRange(0, size);
 
-  console.log(`[UNDO-LOG/analyzeScribble] Analisi di ${points.length} punti`);
+  console.log(`[UNDO-LOG/analyzeScribble] Analyzing ${points.length} points`);
   // saveStringTo(JSON.stringify(points), '/sdcard/points1.json');
 
   let xInversions = 0;
   let yInversions = 0;
   let totalDistance = 0;
 
-  for (let i = 2; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const pPrev = points[i - 2];
+  let minX = points[0].x, maxX = points[0].x;
+  let minY = points[0].y, maxY = points[0].y;
 
-    // Calcolo distanza percorsa
+  // use for for performance and memory protection
+  // start from 1 to avoid double counting
+  for (let i = 1; i < points.length; i++) {
+    const curr = points[i];
+
+    // Bounding Box update
+    if (curr.x < minX) minX = curr.x;
+    if (curr.x > maxX) maxX = curr.x;
+    if (curr.y < minY) minY = curr.y;
+    if (curr.y > maxY) maxY = curr.y;
+
+    const prev = points[i - 1];
+    // Calculate distance traveled
     totalDistance += Math.sqrt(Math.pow(curr.x - prev.x, 2) + Math.pow(curr.y - prev.y, 2));
 
-    // Inversioni asse X
-    if (Math.sign(curr.x - prev.x) !== Math.sign(prev.x - pPrev.x) && Math.abs(curr.x - prev.x) > 2) {
-      xInversions++;
-    }
-    // Inversioni asse Y
-    if (Math.sign(curr.y - prev.y) !== Math.sign(prev.y - pPrev.y) && Math.abs(curr.y - prev.y) > 2) {
-      yInversions++;
+    if (i >= 2) {
+      const prev = points[i - 1];
+      const pPrev = points[i - 2];
+      // X-axis inversions
+      if (Math.sign(curr.x - prev.x) !== Math.sign(prev.x - pPrev.x) && Math.abs(curr.x - prev.x) > 2) {
+        xInversions++;
+      }
+      // Y-axis inversions
+      if (Math.sign(curr.y - prev.y) !== Math.sign(prev.y - pPrev.y) && Math.abs(curr.y - prev.y) > 2) {
+        yInversions++;
+      }
     }
   }
 
-  // Calcolo della dimensione del Bounding Box
-  const width = Math.max(...points.map(p => p.x)) - Math.min(...points.map(p => p.x));
-  const height = Math.max(...points.map(p => p.y)) - Math.min(...points.map(p => p.y));
+  // Bounding Box size calculation
+  const width = maxX - minX;
+  const height = maxY - minY;
   const areaDiagonal = Math.sqrt(width * width + height * height);
 
-  // LOGICA DI IDENTIFICAZIONE:
-  // 1. Molte inversioni totali
-  // 2. La distanza totale percorsa è molto più grande della diagonale dell'area occupata
+  // IDENTIFICATION LOGIC:
+  // 1. Many total inversions
+  // 2. The total distance traveled is much larger than the diagonal of the occupied area
   const isDense = totalDistance > areaDiagonal * 3;
   const hasEnoughJiggles = (xInversions + yInversions) > 10;
 
-  console.log(`[UNDO-LOG/analyzeScribble] Analisi: Inversioni(X:${xInversions}, Y:${yInversions}), Densita':${(totalDistance / areaDiagonal).toFixed(2)}`);
+  console.log(`[UNDO-LOG/analyzeScribble] Analysis: Inversions(X:${xInversions}, Y:${yInversions}), Density:${(totalDistance / areaDiagonal).toFixed(2)}`);
 
   return isDense && hasEnoughJiggles;
 }
@@ -158,6 +173,7 @@ async function getElementBounds(el) {
   const points = await el.stroke.points.getRange(0, size); // [cite: 3, 4]
   //  saveStringTo(JSON.stringify(points), '/sdcard/points2.json');
 
+  // Use for-loop for performance and memory protection
   let minX = points[0].x, minY = points[0].y;
   let maxX = points[0].x, maxY = points[0].y;
   points.forEach(p => {
@@ -176,7 +192,7 @@ async function getElementBounds(el) {
 }
 
 function checkOverlap(scribble, target) {
-  // Confronto rapido tra i rettangoli di ingombro (Bounding Box) [cite: 5]
+  // Quick comparison between bounding boxes [cite: 5]
   //  console.log(`[UNDO-LOG/checkOverlap] scribble ${JSON.stringify(scribble)}`);
   //  console.log(`[UNDO-LOG/checkOverlap] target ${JSON.stringify(target)}`);
   return (
@@ -194,11 +210,34 @@ async function insertGeometryFromArea(area) {
     penWidth: 2,
     type: 'GEO_polygon',
     points: [
-      { x: area.minX, y: area.minY }, // In alto a sinistra
-      { x: area.maxX, y: area.minY }, // In alto a destra
-      { x: area.maxX, y: area.maxY }, // In basso a destra
-      { x: area.minX, y: area.maxY }, // In basso a sinistra
-      { x: area.minX, y: area.minY }  // Torna all'inizio per chiudere 
+      { x: area.minX, y: area.minY }, // Top-left
+      { x: area.maxX, y: area.minY }, // Top-right
+      { x: area.maxX, y: area.maxY }, // Bottom-right
+      { x: area.minX, y: area.maxY }, // Bottom-left
+      { x: area.minX, y: area.minY }  // Back to start to close path 
+    ],
+    ellipseCenterPoint: null,
+    ellipseMajorAxisRadius: 0,
+    ellipseMinorAxisRadius: 0,
+    ellipseAngle: 0,
+  };
+
+  const res = await PluginCommAPI.insertGeometry(geometry);
+  if (!res.success) {
+    throw new Error(res.error?.message ?? 'insertGeometry call failed');
+  }
+  return res.result;
+}
+
+async function insertLineFromArea(area) {
+  const geometry = {
+    penColor: 0x9D,
+    penType: 10,
+    penWidth: 2,
+    type: 'straightLine',
+    points: [
+      { x: area.minX, y: area.minY + 10 }, // Top-left
+      { x: area.maxX, y: area.minY + 10 }, // Top-right
     ],
     ellipseCenterPoint: null,
     ellipseMajorAxisRadius: 0,
