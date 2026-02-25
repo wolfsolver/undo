@@ -42,7 +42,7 @@ function Navigator(): React.JSX.Element {
   //    PluginManager.closePluginView();
   //  };
 
-  log("main", "currentView: " + currentView);
+  log("main", `currentView: ${currentView}`);
   return currentView === "SETTING" ? <Setting /> : <App />;
 
 };

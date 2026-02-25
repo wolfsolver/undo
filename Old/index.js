@@ -1,11 +1,11 @@
-import { AppRegistry, Image } from 'react-native';
+import { AppRegistry, Image, DeviceEventEmitter } from 'react-native';
 import { PluginManager, PluginFileAPI, PluginCommAPI } from 'sn-plugin-lib';
-import App from './App';
+import Navigator from './Navigator';
 import { name as appName } from './app.json';
-import { loadSettings } from './components/Storage.ts';
+import { getDirPath, saveStringTo, loadSettings } from './components/Storage.ts';
 import { log } from './components/ConsoleLog.ts';
 
-AppRegistry.registerComponent(appName, () => App);
+AppRegistry.registerComponent(appName, () => Navigator);
 PluginManager.init();
 
 PluginManager.registerButton(1, ['NOTE'], {
@@ -15,13 +15,48 @@ PluginManager.registerButton(1, ['NOTE'], {
   showType: 1,
 });
 
+PluginManager.registerButtonListener({
+  onButtonPress(event) {
+    log("index", "button press event received");
+    pendingOpenSettings = true; // perche???
+    DeviceEventEmitter.emit('openApp');
+  },
+});
+
+
 PluginManager.registerConfigButton();
+PluginManager.registerConfigButtonListener({
+  onClick() {
+    log("index", "config button press event received");
+    pendingOpenSettings = true;
+    DeviceEventEmitter.emit('openSettings');
+  },
+});
+
+let pendingOpenSettings = false;
+
+export const checkPendingSettings = () => {
+  const value = pendingOpenSettings;
+  pendingOpenSettings = false;
+  log("index", `pendingOpenSettings: ${value}`);
+  return value;
+};
+
 
 const MARGIN = 100;
 
-import { DEFAULT_SETTINGS } from './config/defaultSettings.ts';
+const DEFAULT_SETTINGS = {
+  scribbleWhenPenUp: false,
+  scribbleToDelete: true,
+  scribbleToRectangle: true,
+  scribbleToCircle: true,
+  scribbleToTriangle: true,
+  scribbleToEllipse: true,
+  scribbleToArrow: true,
+};
 
 let lastProcessedUuid = null;
+
 
 PluginManager.registerEventListener('event_pen_up', 1, {
   async onMsg(msg) {

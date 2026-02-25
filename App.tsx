@@ -1,140 +1,172 @@
-import React, { useEffect, useState } from 'react';
-import { DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { PluginCommAPI, PluginManager } from 'sn-plugin-lib';
-import { loadSettings } from './components/Storage';
-import { log } from './components/ConsoleLog';
+/**
+ * Simple Plugin
+ *
+ * @format
+ */
 
-export default function App() {
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  StatusBar,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+  Pressable,
+} from 'react-native';
+import { PluginManager } from 'sn-plugin-lib';
+import { SettingProvider } from './utils/SettingContext';
+import Setting from './module/Setting';
+import Main from './module/Main';
+import { useSettings } from './utils/SettingContext';
+import { log } from './utils/ConsoleLog';
+import config from './app.json';
 
-    const handleClose = () => {
-        PluginManager.closePluginView();
-    };
+/**
+ * Plugin View
+ * Displays Hello World text in the center of the screen
+ */
+function AppContent(): React.JSX.Element {
+  const { settings, updateSettings, isLoading } = useSettings();
+  const [currentView, setCurrentView] = useState<'main' | 'settings'>('main');
+  const pendingEvents = useRef<any[]>([]);
+  const isLoadingRef = useRef(isLoading);
+  const updateSettingsRef = useRef(updateSettings);
+  const [mainKey, setMainKey] = useState(0);
 
-    const insertObjct = () => {
-        insertGeometryFromArea(100, 100, 500, 200);
-        handleClose();
+  // Keep refs up to date to avoid stale closures in the event listener
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+    updateSettingsRef.current = updateSettings;
+  }, [isLoading, updateSettings]);
+
+  const processButtonPress = (event: any) => {
+    log('App', 'Processing Button Press: ' + JSON.stringify(event));
+    if (event.id === 100) {
+      setMainKey(prev => prev + 1);
+      setCurrentView('main');
     }
+  };
 
-    async function insertGeometryFromArea(x1: number, y1: number, x2: number, y2: number) {
-        const geometry = {
-            penColor: 0x9D,
-            penType: 10,
-            penWidth: 500,
-            type: 'GEO_polygon',
-            points: [
-                { x: x1, y: y1 },
-                { x: x2, y: y1 },
-                { x: x2, y: y2 },
-                { x: x1, y: y2 },
-                { x: x1, y: y1 }
-            ],
-            ellipseCenterPoint: null,
-            ellipseMajorAxisRadius: 0,
-            ellipseMinorAxisRadius: 0,
-            ellipseAngle: 0,
-        };
+  useEffect(() => {
+    // Process any buffered events when loading finishes
+    if (!isLoading && pendingEvents.current.length > 0) {
+      log('App', `Processing ${pendingEvents.current.length} buffered events`);
+      pendingEvents.current.forEach((event) => {
+        processButtonPress(event);
+      });
+      pendingEvents.current = [];
+    }
+  }, [isLoading]);
 
-        const res = await PluginCommAPI.insertGeometry(geometry);
-        if (!res.success) {
-            throw new Error(res.error?.message ?? 'insertGeometry call failed');
+  useEffect(() => {
+    // Listen for the Config (Gear) button click
+    const configSub = PluginManager.registerConfigButtonListener({
+      onClick: () => {
+        setCurrentView('settings');
+      },
+    });
+
+    // Listen for custom toolbar buttons (like our Home button ID: 100)
+    const buttonSub = PluginManager.registerButtonListener({
+      onButtonPress: (event) => {
+        log('App', 'Button Pressed: ' + JSON.stringify(event));
+        if (isLoadingRef.current) {
+          log('App', 'Settings still loading, buffering event');
+          pendingEvents.current.push(event);
+        } else {
+          processButtonPress(event);
         }
-        return res.result;
-    }
+      },
+    });
 
-    return (
-        <View style={[styles.container]}>
-            <View style={[styles.header]}>
-                <Text style={[styles.headerTitle]}>
-                    Plugin Settings
-                </Text>
-                <Pressable style={styles.closeButton} onPress={handleClose}>
-                    <Text style={[styles.closeText]}>✕</Text>
-                </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Pressable onPress={insertObjct}>
-                    <Text>TEST</Text>
-                </Pressable>
-            </ScrollView>
+    return () => {
+      configSub.remove();
+      buttonSub.remove();
+    };
+  }, []);
 
+  const handleClose = () => {
+    setCurrentView('main');
+    PluginManager.closePluginView();
+  };
+
+  return (
+    <View style={styles.container}>
+      {isLoading ? (
+        <View style={styles.loader}>
+          <View style={styles.header}>
+            <Text style={styles.title}>[{config.name}] Loading...</Text>
+            <Pressable style={styles.closeButton} onPress={handleClose}>
+              <Text style={[styles.closeText, { color: '#000000' }]}>✕</Text>
+            </Pressable>
+            <StatusBar
+              barStyle={'dark-content'}
+              backgroundColor={'#ffffff'}
+            />
+          </View>
+          <Text style={styles.loadingText}>Loading Settings...</Text>
         </View>
-    );
+      ) : (
+        currentView === 'main' ? (
+          <Main key={mainKey} onClose={handleClose} />
+        ) : (
+          <Setting onClose={handleClose} />
+        )
+      )}
+    </View>
+  );
+}
+
+function App(): React.JSX.Element {
+  return (
+    <SettingProvider>
+      <AppContent />
+    </SettingProvider>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FFFFFF'
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-    },
-    headerTitle: {
-        fontSize: 20,
-    },
-    closeButton: {
-        padding: 8,
-    },
-    closeText: {
-        fontSize: 22,
-        fontWeight: '600',
-    },
-    scrollContent: {
-        padding: 20,
-    },
-    settingRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 15,
-        borderBottomWidth: 0.5,
-    },
-    settingLabel: {
-        fontSize: 18,
-    },
-
-    toggleWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    statusText: {
-        marginRight: 10,
-        fontWeight: 'bold',
-        fontSize: 16,
-        color: '#000',
-    },
-    switch: {
-        width: 60,
-        height: 30,
-        borderRadius: 15,
-        justifyContent: 'center',
-        paddingHorizontal: 4,
-    },
-    switchOn: {
-        backgroundColor: '#000',
-    },
-    switchOff: {
-        backgroundColor: '#333',
-    },
-    handle: {
-        width: 22,
-        height: 22,
-        backgroundColor: '#fff',
-        borderRadius: 11,
-    },
-    handleOn: {
-        alignSelf: 'flex-end',
-        // In alternativa puoi usare: transform: [{ translateX: 0 }] 
-        // se gestisci il posizionamento con flex
-    },
-    handleOff: {
-        alignSelf: 'flex-start',
-    },
-
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 15,
+    color: '#000',
+  },
+  loader: { flex: 1 },
+  loadingText: { textAlign: 'center', marginTop: 20 },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  closeText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  helloText: {
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });
+
+export default App;
