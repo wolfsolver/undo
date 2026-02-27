@@ -16,10 +16,11 @@ import {
 import { PluginManager } from 'sn-plugin-lib';
 import { SettingProvider } from './utils/SettingContext';
 import Setting from './module/Setting';
-import Main from './module/Main';
+// import Main from './module/Main';
 import { useSettings } from './utils/SettingContext';
 import { log } from './utils/ConsoleLog';
 import config from './app.json';
+import Box from "./module/Box";
 
 /**
  * Plugin View
@@ -42,6 +43,8 @@ function AppContent(): React.JSX.Element {
   const processButtonPress = (event: any) => {
     log('App', 'Processing Button Press: ' + JSON.stringify(event));
     if (event.id === 100) {
+      log('App', "event for Main");
+
       setMainKey(prev => prev + 1);
       setCurrentView('main');
     }
@@ -52,7 +55,12 @@ function AppContent(): React.JSX.Element {
     if (!isLoading && pendingEvents.current.length > 0) {
       log('App', `Processing ${pendingEvents.current.length} buffered events`);
       pendingEvents.current.forEach((event) => {
-        processButtonPress(event);
+        if (event.id === 100) {
+          log('App', 'Initial Home event detected, skipping key increment to prevent double mount');
+          setCurrentView('main');
+        } else {
+          processButtonPress(event);
+        }
       });
       pendingEvents.current = [];
     }
@@ -108,7 +116,7 @@ function AppContent(): React.JSX.Element {
         </View>
       ) : (
         currentView === 'main' ? (
-          <Main key={mainKey} onClose={handleClose} />
+          <Box key={mainKey} onClose={handleClose} />
         ) : (
           <Setting onClose={handleClose} />
         )
